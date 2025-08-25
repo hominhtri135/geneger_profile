@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Student ID Card</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f0f2f5;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+        }
+        .student-card-container {
+            width: 540px;
+            height: 340px;
+            background: linear-gradient(135deg, #ffffff, #f0f0f0);
+            border-radius: 15px;
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
+            padding: 25px;
+            box-sizing: border-box;
+            display: flex;
+            flex-direction: column;
+            position: relative;
+            overflow: hidden;
+        }
+        .student-card-container::before {
+            content: '';
+            position: absolute;
+            top: -50px;
+            right: -50px;
+            width: 200px;
+            height: 200px;
+            background: rgba(0, 0, 0, 0.05);
+            border-radius: 50%;
+            transform: rotate(45deg);
+        }
+        .header {
+            display: flex;
+            align-items: center;
+            justify-content: flex-start;
+            margin-bottom: 20px;
+        }
+        .header img {
+            height: 60px;
+            width: auto;
+            margin-right: 15px;
+        }
+        .header h1 {
+            font-size: 20px;
+            font-weight: bold;
+            color: #333;
+            margin: 0;
+            text-transform: uppercase;
+        }
+        .card-body {
+            display: flex;
+            flex-grow: 1;
+        }
+        .photo-container {
+            width: 120px;
+            height: 150px;
+            background-color: #ddd;
+            border-radius: 10px;
+            overflow: hidden;
+            margin-right: 20px;
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+        }
+        .photo-container img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+        .info-container {
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+        }
+        .info-container p {
+            margin: 5px 0;
+            font-size: 14px;
+            color: #555;
+        }
+        .info-container p strong {
+            color: #222;
+            width: 120px;
+            display: inline-block;
+        }
+        .footer {
+            margin-top: 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 12px;
+            color: #888;
+            border-top: 1px dashed #ccc;
+            padding-top: 10px;
+        }
+    </style>
+</head>
+<body>
+    <div class="student-card-container">
+        <div class="header">
+            <img id="uni-logo" src="" alt="University Logo">
+            <h1 id="uni-name"></h1>
+        </div>
+        <div class="card-body">
+            <div class="photo-container">
+                <img id="student-photo" src="" alt="Student Photo">
+            </div>
+            <div class="info-container">
+                <p><strong>Full Name:</strong> <span id="student-name"></span></p>
+                <p><strong>Date of Birth:</strong> <span id="student-dob"></span></p>
+                <p><strong>Course:</strong> <span id="student-course"></span></p>
+                <p><strong>Class:</strong> <span id="student-class"></span></p>
+                <p><strong>Department:</strong> <span id="student-department"></span></p>
+                <p><strong>Student ID:</strong> <span id="student-id"></span></p>
+            </div>
+        </div>
+        <div class="footer">
+            <span>Valid Until: <strong id="valid-until"></strong></span>
+        </div>
+    </div>
+</body>
+</html>

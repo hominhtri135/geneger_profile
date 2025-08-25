@@ -1,0 +1,110 @@
+.student-card-container {
+    width: 500px; /* Kích thước tiêu chuẩn cho thẻ ID */
+    height: 400px;
+    background-color: white;
+    border-radius: 15px;
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+    overflow: hidden;
+    font-family: Arial, sans-serif;
+    color: #333;
+    position: relative;
+    padding: 0;
+}
+
+.card-header {
+    background: linear-gradient(to right, #4c66a4, #6688c2); /* Màu xanh tương tự hình ảnh */
+    color: white;
+    padding: 15px 20px;
+    display: flex;
+    align-items: center;
+}
+
+.logo {
+    width: 60px;
+    height: 60px;
+    margin-right: 15px;
+    border-radius: 10px;
+}
+
+.uni-name {
+    font-size: 1.3em;
+    font-weight: bold;
+    line-height: 1.2;
+}
+
+.card-type {
+    font-size: 0.9em;
+    font-weight: 500;
+    opacity: 0.8;
+}
+
+.card-body {
+    padding: 20px;
+    display: flex;
+    gap: 20px;
+    align-items: flex-start;
+}
+
+.avatar-wrapper {
+  width: 110px;
+  height: 130px;
+  border-radius: 8px;
+  overflow: hidden; /* cắt phần thừa theo border-radius */
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+}
+
+.avatar {
+  width: 100%;
+  height: 100%;
+  border-radius: 8px;
+  object-fit: contain;
+}
+
+.details-section {
+    flex-grow: 1;
+}
+
+.detail-row {
+    margin-bottom: 16px;
+    font-size: 0.95em;
+    margin-top: 0;
+}
+
+.detail-row .label {
+    font-weight: normal;
+    color: #666;
+    margin-right: 5px;
+}
+
+.card-footer {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    width: 100%;
+    padding: 10px 20px 5px 20px;
+    box-sizing: border-box;
+    font-size: 0.8em;
+    color: #555;
+}
+
+.valid-until {
+    margin-bottom: 5px;
+    font-weight: bold;
+    color: #000;
+}
+
+.barcode {
+    width: 90%;
+    height: 40px;
+    display: block;
+    margin: 5px auto;
+    /* Trong thực tế, bạn sẽ cần API để tạo barcode */
+    /* Ở đây ta chỉ dùng placeholder */
+}
+
+.id-number {
+    text-align: center;
+    font-weight: bold;
+    margin-top: 5px;
+    margin-bottom: 5px;
+}

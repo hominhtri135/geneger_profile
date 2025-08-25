@@ -1,0 +1,22 @@
+[
+  {
+    "name": "RohMee Ahluwalia",
+    "dob": "2004-10-21",
+    "course": "2025 - 2029",
+    "class": "ME-BSc-2025",
+    "department": "History",
+    "validUntil": "28/07/2028",
+    "studentId": "MAHE2025.2309279476",
+    "photoUrl": "https://hungvu.id.vn/api/image/Ac3RhdGljL3dvbWFuL3NlZWQzMzY4Ni5qcGVn"
+  },
+  {
+    "name": "Arjun Sharma",
+    "dob": "2003-05-15",
+    "course": "2024 - 2028",
+    "class": "BTech-CS-2024",
+    "department": "Computer Science",
+    "validUntil": "15/07/2028",
+    "studentId": "MAHE2024.1234567890",
+    "photoUrl": "https://hungvu.id.vn/api/image/Ac3RhdGljL3dvbWFuL3NlZWQzMzY4Ni5qcGVn"
+  }
+]

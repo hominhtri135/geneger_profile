@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Official Letter</title>
+    <style>
+        body {
+            font-family: 'Times New Roman', Times, serif;
+            margin: 0;
+            padding: 60px 80px;
+            background-color: #fff;
+            line-height: 1.6;
+        }
+        .letter-container {
+            max-width: 800px;
+            margin: 0 auto;
+        }
+        .header {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-bottom: 2px solid #000;
+            padding-bottom: 10px;
+            margin-bottom: 30px;
+        }
+        .header img {
+            height: 70px;
+            width: auto;
+            margin-right: 15px;
+        }
+        .header h1 {
+            font-size: 24px;
+            margin: 0;
+            text-transform: uppercase;
+        }
+        .letter-meta {
+            text-align: right;
+            font-size: 15px;
+            margin-bottom: 20px;
+            border-bottom: 1px dashed #ccc;
+            padding-bottom: 5px;
+        }
+        .letter-body {
+            font-size: 16px;
+            text-align: justify;
+        }
+        .salutation {
+            margin-bottom: 20px;
+            font-weight: bold;
+        }
+        .content {
+            margin-bottom: 30px;
+        }
+        .content p {
+            margin-bottom: 15px;
+        }
+        .signature-block {
+            margin-top: 80px;
+            display: flex;
+            flex-direction: column;
+            align-items: flex-start;
+            font-size: 16px;
+        }
+        .signature-block .signature-line {
+            width: 250px;
+            border-bottom: 1px solid #000;
+            margin-top: 5px;
+            margin-bottom: 5px;
+        }
+        .signature-block p {
+            margin: 5px 0;
+        }
+        .stamp {
+            width: 120px;
+            height: 120px;
+            border-radius: 50%;
+            border: 4px solid #c00;
+            color: #c00;
+            font-size: 11px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-weight: bold;
+            text-align: center;
+            transform: rotate(-15deg);
+            opacity: 0.8;
+            box-sizing: border-box;
+            position: absolute;
+            bottom: 150px;
+            right: 100px;
+        }
+    </style>
+</head>
+<body>
+    <div class="letter-container">
+        <div class="header">
+            <img id="uni-logo-letter" src="" alt="University Logo">
+            <h1 id="uni-name-letter"></h1>
+        </div>
+
+        <div class="letter-meta">
+            <p>Date: <span id="letter-date"></span></p>
+        </div>
+
+        <div class="letter-body">
+            <div class="salutation">To Whom It May Concern,</div>
+            <div class="content">
+                <p>This letter is to confirm that <strong id="student-name-letter"></strong> (Student ID: <strong id="student-id-letter"></strong>) is a currently enrolled student in the **<span id="student-course-letter"></span>** program within the **<span id="student-department-letter"></span>** department.</p>
+                <p>He/She was admitted in the year <span id="student-start-year"></span> and is expected to complete the program in the year <span id="student-end-year"></span>.</p>
+                <p>All information provided herein is true and accurate according to the university's records.</p>
+            </div>
+            <div class="closing">Sincerely,</div>
+        </div>
+        
+        <div class="signature-block">
+            <p>-------------------------</p>
+            <p>Registrar's Office</p>
+            <p><span id="uni-name-signature"></span></p>
+        </div>
+
+        <div class="stamp">CONFIRMED <br/> FOR <br/> ACADEMIC <br/> YEAR <br/> 2025-2026</div>
+    </div>
+</body>
+</html>

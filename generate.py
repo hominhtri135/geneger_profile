@@ -319,7 +319,7 @@ def generate_autofill_script(data):
     first_name, last_name = data["name"].split(" ", 1)
     dob_date = datetime.datetime.strptime(data["dob"], "%Y-%m-%d")
     day = dob_date.strftime("%d")
-    month = dob_date.strftime("%B")
+    month = str(int(dob_date.strftime("%m")))
     year = dob_date.strftime("%Y")
     # ... (phần còn lại của script)
     return f"""
@@ -391,6 +391,7 @@ def generate_autofill_script(data):
   await set('#sid-birthdate-day', "{day}");
   await set('#sid-birthdate-year', "{year}");
 
+
   // 4. Chọn tháng sinh
   const selectMonth = async () => {{
     const el = document.querySelector('#sid-birthdate__month');
@@ -401,7 +402,7 @@ def generate_autofill_script(data):
     el.dispatchEvent(new KeyboardEvent('keydown', {{ key: 'ArrowDown', bubbles: true }}));
     await delay(500);
     [...document.querySelectorAll('#sid-birthdate__month-menu [role="option"]')]
-      .find(o => o.innerText.toLowerCase().includes("{month}".toLowerCase()))?.click();
+      .find(o => o.innerText.toLowerCase().includes("Tháng {month}".toLowerCase()))?.click();
     await delay(300);
   }};
 

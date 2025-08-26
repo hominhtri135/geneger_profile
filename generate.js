@@ -1,6 +1,13 @@
 const puppeteer = require('puppeteer');
 const fs = require('fs');
 const path = require('path');
+const readline = require("readline");
+
+// Tạo interface để đọc input từ console
+const rl = readline.createInterface({
+  input: process.stdin,
+  output: process.stdout,
+});
 
 // --- Indian University Data ---
 const universities = [
@@ -8,11 +15,6 @@ const universities = [
     name: "IIM Bangalore",
     logo_url:
       "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcThnWEFNAwfrO_g7WZj4XMyiecwYFcsObAMFw&s",
-  },
-  {
-    name: "Christ University",
-    logo_url:
-      "https://upload.wikimedia.org/wikipedia/en/d/dd/Official_Logo_of_CHRIST%28Deemed_to_be_University%29%2C_bangalore.jpg",
   },
 ];
 
@@ -228,21 +230,40 @@ function createRealisticIndianStudent(gender) {
   };
 }
 
+// Helper function để hỏi input từ người dùng
+function askQuestion(question) {
+  return new Promise((resolve) => {
+    rl.question(question, (answer) => {
+      resolve(answer);
+    });
+  });
+}
+
 // Function to process a single student card
 async function processStudentCard(
   browser,
   gender,
   photoFile,
   imagesDir,
-  outputDir
+  outputDir,
+  studentData = null,
+  sequenceNumber = 1
 ) {
-  const studentData = createRealisticIndianStudent(gender);
+  // Nếu không có studentData được truyền vào, tạo mới
+  if (!studentData) {
+    studentData = createRealisticIndianStudent(gender);
+  }
+
   studentData.photoUrl = `file://${path.join(imagesDir, photoFile)}`;
 
   console.log(`   -> ${studentData.university.name}: ${studentData.name}...`);
+
+  // Format số thứ tự với leading zeros (ví dụ: 001, 002, ...)
+  const paddedSequence = String(sequenceNumber).padStart(3, "0");
+
   const studentOutputDir = path.join(
     outputDir,
-    `${studentData.university.name.replace(/\s/g, "_")}_${
+    `${paddedSequence}_${studentData.university.name.replace(/\s/g, "_")}_${
       studentData.studentId
     }`
   );
@@ -402,6 +423,14 @@ async function processStudentCard(
   });
   await letterPage.close();
 
+  // Tạo script auto-fill từ dữ liệu JSON
+  const autoFillScript = generateAutoFillScript(studentData);
+  fs.writeFileSync(
+    path.join(studentOutputDir, "auto_fill_script.js"),
+    autoFillScript,
+    "utf8"
+  );
+
   delete studentData.photoUrl;
   fs.writeFileSync(
     path.join(studentOutputDir, "student_info.json"),
@@ -412,11 +441,159 @@ async function processStudentCard(
   return 1; // Return count of processed files
 }
 
+// Function để tạo script auto-fill từ dữ liệu JSON
+function generateAutoFillScript(data) {
+  const [firstName, lastName] = data.name.split(" ");
+  const dobDate = new Date(data.dob);
+  const day = String(dobDate.getDate()).padStart(2, "0");
+  const month = dobDate.toLocaleString("vi-VN", { month: "long" });
+  const year = dobDate.getFullYear();
+
+  return `(async () => {
+  const data = ${JSON.stringify(data, null, 2)};
+
+  const delay = ms => new Promise(r => setTimeout(r, ms));
+  const set = async (sel, val) => {
+    const el = document.querySelector(sel);
+    if (!el) return;
+    const setVal = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value").set;
+    setVal.call(el, val);
+    el.dispatchEvent(new Event("input", { bubbles: true }));
+    el.dispatchEvent(new Event("change", { bubbles: true }));
+    el.dispatchEvent(new Event("blur", { bubbles: true }));
+    await delay(150);
+  };
+
+  const selectFromDropdown = async (inputSelector, menuSelector, matchText) => {
+    const el = document.querySelector(inputSelector);
+    if (!el) return;
+    el.focus();
+    el.click();
+    await delay(500);
+    el.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true }));
+    await delay(800);
+    const options = document.querySelectorAll(\`\${menuSelector} [role="option"]\`);
+    const match = [...options].find(opt => opt.innerText.toLowerCase().includes(matchText.toLowerCase()));
+    match?.click();
+    await delay(300);
+  };
+
+  // 1. Chọn quốc gia trước
+  const selectCountry = async () => {
+    const input = document.querySelector('#sid-country');
+    if (!input) return;
+    input.focus();
+    input.click();
+    await delay(400);
+    input.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true }));
+    await delay(800);
+    const options = document.querySelectorAll('#sid-country-menu [role="option"]');
+    const match = [...options].find(opt => opt.innerText.toLowerCase().includes("ấn độ"));
+    match?.click();
+    await delay(400);
+  };
+
+  await selectCountry();
+
+  // 2. Điền tên trường đại học và chờ chọn
+  const pasteSchool = async (val) => {
+    const el = document.querySelector('#sid-college-name');
+    if (!el) return;
+    Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set.call(el, val);
+    el.dispatchEvent(new Event('input', { bubbles: true }));
+    await delay(2000); // đợi danh sách load xong
+    document.querySelector('#sid-college-name-menu [role="option"]')?.click();
+    await delay(500);
+  };
+
+  await pasteSchool(data.university.name);
+
+  // 3. Điền các trường còn lại
+  const firstName = "${firstName}";
+  const lastName = "${lastName}";
+
+  await set('#sid-first-name', firstName);
+  await set('#sid-last-name', lastName);
+  await set('#sid-birthdate-day', "${day}");
+  await set('#sid-birthdate-year', "${year}");
+
+  // 4. Chọn tháng sinh
+  const selectMonth = async () => {
+    const el = document.querySelector('#sid-birthdate__month');
+    if (!el) return;
+    el.focus();
+    el.click();
+    await delay(400);
+    el.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true }));
+    await delay(500);
+    [...document.querySelectorAll('#sid-birthdate__month-menu [role="option"]')]
+      .find(o => o.innerText.toLowerCase().includes("${month}".toLowerCase()))?.click();
+    await delay(300);
+  };
+
+  await selectMonth();
+
+  console.log("✅ Form đã được điền từ JSON cho: " + data.name);
+})();`;
+}
+
 async function generateCards() {
   const baseImagesDir = path.join(__dirname, "images");
   const outputDir = path.join(__dirname, "output");
-  const genders = ["male", "female"];
   const MAX_CONCURRENT = 10; // Số luồng xử lý đồng thời tối đa
+
+  console.log("🚀 Student Card Generator - Interactive Mode");
+  console.log("============================================");
+
+  // Hỏi số lượng cần tạo
+  const totalCount = parseInt(
+    await askQuestion("💬 Nhập số lượng thẻ sinh viên cần tạo: ")
+  );
+  if (isNaN(totalCount) || totalCount <= 0) {
+    console.log("❌ Số lượng không hợp lệ!");
+    rl.close();
+    return;
+  }
+
+  // Hỏi giới tính
+  console.log("\n📋 Chọn giới tính:");
+  console.log("1. Nam (male)");
+  console.log("2. Nữ (female)");
+  console.log("3. Ngẫu nhiên (random)");
+
+  const genderChoice = await askQuestion("👤 Nhập lựa chọn (1/2/3): ");
+  let targetGender;
+
+  switch (genderChoice) {
+    case "1":
+      targetGender = "male";
+      break;
+    case "2":
+      targetGender = "female";
+      break;
+    case "3":
+      targetGender = "random";
+      break;
+    default:
+      console.log("❌ Lựa chọn không hợp lệ!");
+      rl.close();
+      return;
+  }
+
+  rl.close(); // Đóng interface sau khi có đủ thông tin
+
+  // Tạo thư mục với timestamp
+  const now = new Date();
+  const timestamp =
+    now.getHours().toString().padStart(2, "0") +
+    now.getMinutes().toString().padStart(2, "0") +
+    now.getSeconds().toString().padStart(2, "0") +
+    "_" +
+    now.getDate().toString().padStart(2, "0") +
+    now.getMonth().toString().padStart(2, "0") +
+    now.getFullYear().toString().padStart(2, "0");
+
+  const sessionOutputDir = path.join(outputDir, timestamp);
 
   if (!fs.existsSync(baseImagesDir)) {
     console.log(
@@ -431,37 +608,96 @@ async function generateCards() {
     return;
   }
   if (!fs.existsSync(outputDir)) fs.mkdirSync(outputDir);
+  if (!fs.existsSync(sessionOutputDir))
+    fs.mkdirSync(sessionOutputDir, { recursive: true });
+
+  // Lấy danh sách ảnh theo giới tính
+  let availableImages = [];
+
+  if (targetGender === "random") {
+    // Lấy cả nam và nữ
+    const maleDir = path.join(baseImagesDir, "male");
+    const femaleDir = path.join(baseImagesDir, "female");
+
+    if (fs.existsSync(maleDir)) {
+      const maleImages = fs
+        .readdirSync(maleDir)
+        .filter((file) => /\.(jpg|jpeg|png|gif)$/i.test(file))
+        .map((file) => ({ gender: "male", file, dir: maleDir }));
+      availableImages.push(...maleImages);
+    }
+
+    if (fs.existsSync(femaleDir)) {
+      const femaleImages = fs
+        .readdirSync(femaleDir)
+        .filter((file) => /\.(jpg|jpeg|png|gif)$/i.test(file))
+        .map((file) => ({ gender: "female", file, dir: femaleDir }));
+      availableImages.push(...femaleImages);
+    }
+  } else {
+    // Chỉ lấy giới tính được chọn
+    const targetDir = path.join(baseImagesDir, targetGender);
+    if (fs.existsSync(targetDir)) {
+      const images = fs
+        .readdirSync(targetDir)
+        .filter((file) => /\.(jpg|jpeg|png|gif)$/i.test(file))
+        .map((file) => ({ gender: targetGender, file, dir: targetDir }));
+      availableImages.push(...images);
+    }
+  }
+
+  if (availableImages.length === 0) {
+    console.log(
+      `❌ Không tìm thấy ảnh nào trong thư mục ${
+        targetGender === "random" ? "male/female" : targetGender
+      }!`
+    );
+    return;
+  }
+
+  console.log(
+    `\n✅ Tìm thấy ${availableImages.length} ảnh. Bắt đầu tạo ${totalCount} thẻ sinh viên...`
+  );
+  console.log(`📁 Kết quả sẽ được lưu trong: ${sessionOutputDir}`);
 
   const browser = await puppeteer.launch({
     headless: true,
-    args: ["--no-sandbox", "--disable-setuid-sandbox"], // Thêm args để tối ưu performance
+    args: ["--no-sandbox", "--disable-setuid-sandbox"],
   });
 
   let totalFilesProcessed = 0;
   const allTasks = [];
 
-  // Tạo danh sách tất cả các tác vụ cần xử lý
-  for (const gender of genders) {
-    const imagesDir = path.join(baseImagesDir, gender);
-    if (!fs.existsSync(imagesDir)) continue;
+  // Tạo danh sách tác vụ với logic lặp vòng tròn
+  for (let i = 0; i < totalCount; i++) {
+    const imageIndex = i % availableImages.length; // Lặp vòng tròn
+    const imageInfo = availableImages[imageIndex];
 
-    const imageFiles = fs
-      .readdirSync(imagesDir)
-      .filter((file) => /\.(jpg|jpeg|png|gif)$/i.test(file));
-    if (imageFiles.length === 0) continue;
+    // Tạo dữ liệu sinh viên mới cho mỗi lần tạo
+    const studentData = createRealisticIndianStudent(imageInfo.gender);
 
-    console.log(
-      `\n✅ Found ${imageFiles.length} images in "${gender}" directory. Starting to process...`
-    );
-
-    for (const photoFile of imageFiles) {
-      allTasks.push({ gender, photoFile, imagesDir });
-    }
+    allTasks.push({
+      gender: imageInfo.gender,
+      photoFile: imageInfo.file,
+      imagesDir: imageInfo.dir,
+      studentData: studentData,
+      index: i + 1,
+    });
   }
+
+  console.log(
+    `\n🔄 Sẽ xử lý ${allTasks.length} thẻ sinh viên với ${availableImages.length} ảnh (lặp vòng tròn khi cần)...`
+  );
 
   // Xử lý các tác vụ theo từng batch với số lượng giới hạn
   for (let i = 0; i < allTasks.length; i += MAX_CONCURRENT) {
     const batch = allTasks.slice(i, i + MAX_CONCURRENT);
+
+    console.log(
+      `\n📦 Đang xử lý batch ${Math.floor(i / MAX_CONCURRENT) + 1}/${Math.ceil(
+        allTasks.length / MAX_CONCURRENT
+      )} (${batch.length} files)...`
+    );
 
     const batchPromises = batch.map((task) =>
       processStudentCard(
@@ -469,8 +705,28 @@ async function generateCards() {
         task.gender,
         task.photoFile,
         task.imagesDir,
-        outputDir
+        sessionOutputDir, // Sử dụng sessionOutputDir thay vì outputDir
+        task.studentData,
+        task.index // Truyền số thứ tự
       )
+        .then((result) => {
+          const paddedSequence = String(task.index).padStart(3, "0");
+          console.log(
+            `   ✅ Hoàn thành ${
+              task.index
+            }/${totalCount}: ${paddedSequence}_${task.studentData.university.name.replace(
+              /\s/g,
+              "_"
+            )}_${task.studentData.studentId}`
+          );
+          return result;
+        })
+        .catch((error) => {
+          console.error(
+            `   ❌ Lỗi ${task.index}/${totalCount}: ${error.message}`
+          );
+          return 0;
+        })
     );
 
     try {
@@ -478,13 +734,13 @@ async function generateCards() {
       totalFilesProcessed += results.reduce((sum, count) => sum + count, 0);
 
       console.log(
-        `✅ Completed batch ${Math.floor(i / MAX_CONCURRENT) + 1}/${Math.ceil(
+        `✅ Hoàn thành batch ${Math.floor(i / MAX_CONCURRENT) + 1}/${Math.ceil(
           allTasks.length / MAX_CONCURRENT
-        )} (${batch.length} files)`
+        )} - Tổng đã xử lý: ${totalFilesProcessed}/${totalCount}`
       );
     } catch (error) {
       console.error(
-        `❌ Error processing batch ${Math.floor(i / MAX_CONCURRENT) + 1}:`,
+        `❌ Lỗi khi xử lý batch ${Math.floor(i / MAX_CONCURRENT) + 1}:`,
         error
       );
     }
@@ -492,13 +748,31 @@ async function generateCards() {
 
   await browser.close();
 
+  console.log("\n" + "=".repeat(50));
   if (totalFilesProcessed > 0) {
     console.log(
-      `\n🚀 Success! A total of ${totalFilesProcessed} document sets have been created.`
+      `🚀 THÀNH CÔNG! Đã tạo ${totalFilesProcessed}/${totalCount} bộ tài liệu sinh viên.`
     );
+    console.log(`📁 Kết quả được lưu trong thư mục: ${sessionOutputDir}`);
+    console.log(`📅 Session timestamp: ${timestamp}`);
+    console.log("\n📋 Mỗi sinh viên có:");
+    console.log("   - student_card.png (Thẻ sinh viên)");
+    console.log("   - registration_fee_receipt.pdf (Biên lai phí)");
+    console.log("   - official_letter.pdf (Thư chính thức)");
+    console.log("   - student_info.json (Thông tin JSON)");
+    console.log("   - auto_fill_script.js (Script tự động điền form)");
+
+    if (totalFilesProcessed < totalCount) {
+      console.log(
+        `\n⚠️  Lưu ý: ${
+          totalCount - totalFilesProcessed
+        } file không được xử lý do lỗi.`
+      );
+    }
   } else {
-    console.log("\n🔴 No images were processed.");
+    console.log("\n🔴 Không có file nào được xử lý thành công.");
   }
+  console.log("=".repeat(50));
 }
 
 generateCards().catch(err => {

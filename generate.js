@@ -239,7 +239,7 @@ function askQuestion(question) {
   });
 }
 
-// Function to process a single student card
+// Function to process a single student card - OPTIMIZED SEQUENTIAL VERSION
 async function processStudentCard(
   browser,
   gender,
@@ -256,8 +256,6 @@ async function processStudentCard(
 
   studentData.photoUrl = `file://${path.join(imagesDir, photoFile)}`;
 
-  console.log(`   -> ${studentData.university.name}: ${studentData.name}...`);
-
   // Format số thứ tự với leading zeros (ví dụ: 001, 002, ...)
   const paddedSequence = String(sequenceNumber).padStart(3, "0");
 
@@ -270,12 +268,40 @@ async function processStudentCard(
   if (!fs.existsSync(studentOutputDir))
     fs.mkdirSync(studentOutputDir, { recursive: true });
 
-  // Generate Student ID Card
-  const cardPage = await browser.newPage();
-  await cardPage.goto(`file://${path.join(__dirname, "index.html")}`, {
-    waitUntil: "networkidle0",
+  try {
+    console.log(`      🔥 Task ${sequenceNumber}: Chạy song song`);
+    const autoFillScript = generateAutoFillScript(studentData);
+
+    return Promise.all([
+      generateStudentCard(browser, studentData, studentOutputDir),
+      generateFeeReceipt(browser, studentData, studentOutputDir),
+      generateOfficialLetter(browser, studentData, studentOutputDir),
+      fs.promises.writeFile(
+        path.join(studentOutputDir, "auto_fill_script.js"),
+        autoFillScript,
+        "utf8"
+      ),
+      fs.promises.writeFile(
+        path.join(studentOutputDir, "student_info.json"),
+        JSON.stringify({ ...studentData, photoUrl: undefined }, null, 2),
+        "utf8"
+      ),
+    ]);
+  } catch (error) {
+    console.error(`❌ Error in processStudentCard: ${error.message}`);
+    throw error;
+  }
+}
+
+// Helper function để tạo student card (reuse page)
+async function generateStudentCard(browser, studentData, studentOutputDir) {
+  const page = await browser.newPage();
+
+  await page.goto(`file://${path.join(__dirname, "index.html")}`, {
+    waitUntil: "domcontentloaded",
   });
-  await cardPage.evaluate((data) => {
+
+  await page.evaluate((data) => {
     const uniLogo = document.getElementById("uni-logo");
     if (uniLogo) uniLogo.src = data.university.logo_url;
 
@@ -306,21 +332,27 @@ async function processStudentCard(
     const studentId = document.getElementById("student-id");
     if (studentId) studentId.textContent = data.studentId;
   }, studentData);
-  const cardElement = await cardPage.$(".student-card-container");
+
+  const cardElement = await page.$(".student-card-container");
   if (cardElement) {
     await cardElement.screenshot({
       path: path.join(studentOutputDir, "student_card.png"),
       omitBackground: true,
     });
   }
-  await cardPage.close();
 
-  // Generate Registration Fee Receipt (in PDF format)
-  const receiptPage = await browser.newPage();
-  await receiptPage.goto(`file://${path.join(__dirname, "fee_receipt.html")}`, {
-    waitUntil: "networkidle0",
+  await page.close();
+}
+
+// Helper function để tạo fee receipt (reuse page)
+async function generateFeeReceipt(browser, studentData, studentOutputDir) {
+  const page = await browser.newPage();
+
+  await page.goto(`file://${path.join(__dirname, "fee_receipt.html")}`, {
+    waitUntil: "domcontentloaded",
   });
-  await receiptPage.evaluate((data) => {
+
+  await page.evaluate((data) => {
     const uniLogoReceipt = document.getElementById("uni-logo-receipt");
     if (uniLogoReceipt) uniLogoReceipt.src = data.university.logo_url;
 
@@ -360,20 +392,25 @@ async function processStudentCard(
         Math.floor(Math.random() * (20000 - 5000 + 1)) + 5000
       ).toLocaleString("en-IN");
   }, studentData);
-  await receiptPage.pdf({
+
+  await page.pdf({
     path: path.join(studentOutputDir, "registration_fee_receipt.pdf"),
     format: "A4",
     printBackground: true,
   });
-  await receiptPage.close();
 
-  // Generate Official Letter (in PDF format)
-  const letterPage = await browser.newPage();
-  await letterPage.goto(
-    `file://${path.join(__dirname, "official_letter.html")}`,
-    { waitUntil: "networkidle0" }
-  );
-  await letterPage.evaluate((data) => {
+  await page.close();
+}
+
+// Helper function để tạo official letter (reuse page)
+async function generateOfficialLetter(browser, studentData, studentOutputDir) {
+  const page = await browser.newPage();
+
+  await page.goto(`file://${path.join(__dirname, "official_letter.html")}`, {
+    waitUntil: "domcontentloaded",
+  });
+
+  await page.evaluate((data) => {
     const today = new Date();
     const formattedDate = today.toLocaleDateString("en-GB", {
       day: "2-digit",
@@ -416,29 +453,14 @@ async function processStudentCard(
     const uniNameSignature = document.getElementById("uni-name-signature");
     if (uniNameSignature) uniNameSignature.textContent = data.university.name;
   }, studentData);
-  await letterPage.pdf({
+
+  await page.pdf({
     path: path.join(studentOutputDir, "official_letter.pdf"),
     format: "A4",
     printBackground: true,
   });
-  await letterPage.close();
 
-  // Tạo script auto-fill từ dữ liệu JSON
-  const autoFillScript = generateAutoFillScript(studentData);
-  fs.writeFileSync(
-    path.join(studentOutputDir, "auto_fill_script.js"),
-    autoFillScript,
-    "utf8"
-  );
-
-  delete studentData.photoUrl;
-  fs.writeFileSync(
-    path.join(studentOutputDir, "student_info.json"),
-    JSON.stringify(studentData, null, 2),
-    "utf8"
-  );
-
-  return 1; // Return count of processed files
+  await page.close();
 }
 
 // Function để tạo script auto-fill từ dữ liệu JSON
@@ -537,12 +559,39 @@ function generateAutoFillScript(data) {
 })();`;
 }
 
+// Function để tạo browser đơn giản hóa với args tối ưu hơn
+async function createOptimizedBrowser() {
+  return puppeteer.launch({
+    headless: "new",
+    args: [
+      "--no-sandbox",
+      "--disable-setuid-sandbox",
+      "--disable-dev-shm-usage",
+      "--disable-web-security",
+      "--disable-features=TranslateUI",
+      "--disable-ipc-flooding-protection",
+      "--disable-renderer-backgrounding",
+      "--disable-backgrounding-occluded-windows",
+      "--disable-background-timer-throttling",
+      "--disable-client-side-phishing-detection",
+      "--disable-default-apps",
+      "--disable-extensions",
+      "--disable-sync",
+      "--disable-translate",
+      "--hide-scrollbars",
+      "--mute-audio",
+      "--no-first-run",
+    ],
+    defaultViewport: { width: 1200, height: 800 },
+  });
+}
+
 async function generateCards() {
   const baseImagesDir = path.join(__dirname, "images");
   const outputDir = path.join(__dirname, "output");
-  const MAX_CONCURRENT = 10; // Số luồng xử lý đồng thời tối đa
+  const MAX_CONCURRENT = 5;
 
-  console.log("🚀 Student Card Generator - Interactive Mode");
+  console.log("🚀 Student Card Generator - Interactive Mode (Optimized)");
   console.log("============================================");
 
   // Hỏi số lượng cần tạo
@@ -556,29 +605,31 @@ async function generateCards() {
   }
 
   // Hỏi giới tính
-  console.log("\n📋 Chọn giới tính:");
-  console.log("1. Nam (male)");
-  console.log("2. Nữ (female)");
-  console.log("3. Ngẫu nhiên (random)");
+  // console.log("\n📋 Chọn giới tính:");
+  // console.log("1. Nam (male)");
+  // console.log("2. Nữ (female)");
+  // console.log("3. Ngẫu nhiên (random)");
 
-  const genderChoice = await askQuestion("👤 Nhập lựa chọn (1/2/3): ");
-  let targetGender;
+  // const genderChoice = await askQuestion("👤 Nhập lựa chọn (1/2/3): ");
+  // let targetGender;
 
-  switch (genderChoice) {
-    case "1":
-      targetGender = "male";
-      break;
-    case "2":
-      targetGender = "female";
-      break;
-    case "3":
-      targetGender = "random";
-      break;
-    default:
-      console.log("❌ Lựa chọn không hợp lệ!");
-      rl.close();
-      return;
-  }
+  // switch (genderChoice) {
+  //   case "1":
+  //     targetGender = "male";
+  //     break;
+  //   case "2":
+  //     targetGender = "female";
+  //     break;
+  //   case "3":
+  //     targetGender = "random";
+  //     break;
+  //   default:
+  //     console.log("❌ Lựa chọn không hợp lệ!");
+  //     rl.close();
+  //     return;
+  // }
+
+  targetGender = "female";
 
   rl.close(); // Đóng interface sau khi có đủ thông tin
 
@@ -660,10 +711,9 @@ async function generateCards() {
   );
   console.log(`📁 Kết quả sẽ được lưu trong: ${sessionOutputDir}`);
 
-  const browser = await puppeteer.launch({
-    headless: true,
-    args: ["--no-sandbox", "--disable-setuid-sandbox"],
-  });
+  console.log("🌐 Đang khởi động browser (tối ưu cho hiệu suất)...");
+
+  const browser = await createOptimizedBrowser();
 
   let totalFilesProcessed = 0;
   const allTasks = [];
@@ -689,54 +739,80 @@ async function generateCards() {
     `\n🔄 Sẽ xử lý ${allTasks.length} thẻ sinh viên với ${availableImages.length} ảnh (lặp vòng tròn khi cần)...`
   );
 
+  const startTime = Date.now();
+
   // Xử lý các tác vụ theo từng batch với số lượng giới hạn
   for (let i = 0; i < allTasks.length; i += MAX_CONCURRENT) {
     const batch = allTasks.slice(i, i + MAX_CONCURRENT);
+    const batchStartTime = Date.now();
 
     console.log(
       `\n📦 Đang xử lý batch ${Math.floor(i / MAX_CONCURRENT) + 1}/${Math.ceil(
         allTasks.length / MAX_CONCURRENT
-      )} (${batch.length} files)...`
+      )} (${batch.length} tasks SONG SONG)...`
     );
 
-    const batchPromises = batch.map((task) =>
-      processStudentCard(
+    const batchPromises = batch.map((task) => {
+      const startTime = Date.now();
+      console.log(
+        `   🚀 [${new Date().toISOString()}] Bắt đầu task ${
+          task.index
+        } song song...`
+      );
+      return processStudentCard(
         browser,
         task.gender,
         task.photoFile,
         task.imagesDir,
-        sessionOutputDir, // Sử dụng sessionOutputDir thay vì outputDir
+        sessionOutputDir,
         task.studentData,
-        task.index // Truyền số thứ tự
+        task.index
       )
         .then((result) => {
-          const paddedSequence = String(task.index).padStart(3, "0");
+          const endTime = Date.now();
+          const duration = ((endTime - startTime) / 1000).toFixed(1);
           console.log(
-            `   ✅ Hoàn thành ${
+            `   ✅ [${new Date().toISOString()}] Hoàn thành task ${
               task.index
-            }/${totalCount}: ${paddedSequence}_${task.studentData.university.name.replace(
-              /\s/g,
-              "_"
-            )}_${task.studentData.studentId}`
+            }/${totalCount} (${duration}s): ${String(task.index).padStart(
+              3,
+              "0"
+            )}_${task.studentData.university.name.replace(/\s/g, "_")}_${
+              task.studentData.studentId
+            }`
           );
-          return result;
+          return 1;
         })
         .catch((error) => {
           console.error(
-            `   ❌ Lỗi ${task.index}/${totalCount}: ${error.message}`
+            `   ❌ [${new Date().toISOString()}] Lỗi task ${
+              task.index
+            }/${totalCount}: ${error.message}`
           );
           return 0;
-        })
-    );
+        });
+    });
 
     try {
       const results = await Promise.all(batchPromises);
       totalFilesProcessed += results.reduce((sum, count) => sum + count, 0);
 
+      const batchTime = (Date.now() - batchStartTime) / 1000;
+      const avgTimePerFile = batchTime / batch.length;
+      const remainingFiles = totalCount - (i + batch.length);
+      const estimatedTimeLeft = (remainingFiles / MAX_CONCURRENT) * batchTime;
+
       console.log(
         `✅ Hoàn thành batch ${Math.floor(i / MAX_CONCURRENT) + 1}/${Math.ceil(
           allTasks.length / MAX_CONCURRENT
         )} - Tổng đã xử lý: ${totalFilesProcessed}/${totalCount}`
+      );
+      console.log(
+        `⏱️  Batch time: ${batchTime.toFixed(
+          1
+        )}s | Avg/file: ${avgTimePerFile.toFixed(1)}s | ETA: ${Math.ceil(
+          estimatedTimeLeft
+        )}s`
       );
     } catch (error) {
       console.error(
@@ -748,7 +824,20 @@ async function generateCards() {
 
   await browser.close();
 
-  console.log("\n" + "=".repeat(50));
+  const totalTime = (Date.now() - startTime) / 1000;
+
+  console.log("\n" + "=".repeat(60));
+  console.log("📊 BÁO CÁO HIỆU SUẤT:");
+  console.log(`⏱️  Tổng thời gian: ${totalTime.toFixed(1)}s`);
+  console.log(
+    `⚡ Tốc độ trung bình: ${(totalFilesProcessed / totalTime).toFixed(
+      1
+    )} files/giây`
+  );
+  console.log(`🕒 Thời gian mỗi file: ${(totalTime / totalCount).toFixed(2)}s`);
+  console.log(`🔄 Xử lý song song: ${MAX_CONCURRENT} tác vụ cùng lúc`);
+  console.log("=".repeat(60));
+
   if (totalFilesProcessed > 0) {
     console.log(
       `🚀 THÀNH CÔNG! Đã tạo ${totalFilesProcessed}/${totalCount} bộ tài liệu sinh viên.`
@@ -772,10 +861,20 @@ async function generateCards() {
   } else {
     console.log("\n🔴 Không có file nào được xử lý thành công.");
   }
-  console.log("=".repeat(50));
+  console.log("=".repeat(60));
 }
 
-generateCards().catch(err => {
-    console.error('❌ A serious error occurred:', err);
-    process.exit(1);
-});
+// Export functions for testing
+module.exports = {
+  processStudentCard,
+  createOptimizedBrowser,
+  createRealisticIndianStudent
+};
+
+// Chỉ chạy generateCards nếu file này được chạy trực tiếp
+if (require.main === module) {
+  generateCards().catch(err => {
+      console.error('❌ A serious error occurred:', err);
+      process.exit(1);
+  });
+}
